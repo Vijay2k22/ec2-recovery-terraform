@@ -1,0 +1,19 @@
+#!/bin/bash
+set -euxo pipefail
+dnf install -y docker
+systemctl enable --now docker
+mkdir -p /opt/ec2-recovery-agent
+base64 -d > /opt/ec2-recovery-agent/Dockerfile <<'B64_DOCKER'
+${dockerfile_b64}
+B64_DOCKER
+base64 -d > /opt/ec2-recovery-agent/agent.py <<'B64_AGENT'
+${agent_b64}
+B64_AGENT
+cd /opt/ec2-recovery-agent
+docker build -t ec2-recovery-agent:1.0 .
+docker run -d --name ec2-recovery-agent --restart unless-stopped \
+  -e INSTANCE_IDS='${instance_ids}' \
+  -e TARGET_GROUP_ARN='${target_group_arn}' \
+  -e SNS_TOPIC_ARN='${sns_topic_arn}' \
+  -e METRIC_NAMESPACE='${metric_namespace}' \
+  ec2-recovery-agent:1.0
